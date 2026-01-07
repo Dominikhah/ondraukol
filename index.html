@@ -3,26 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ondra Bird - Nový Žebříček 🐦</title>
+    <title>Ondra Bird - Vyladěná verze 🐦</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; background: #4ec0ca; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
-        canvas { border: 4px solid #333; border-radius: 10px; background: #70c5ce; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .ui { position: absolute; background: white; padding: 25px; border-radius: 15px; text-align: center; width: 280px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
-        input { width: 80%; padding: 10px; margin: 10px 0; border-radius: 5px; border: 1px solid #ccc; }
-        button { background: #f79521; color: white; border: none; padding: 12px; border-radius: 5px; width: 90%; font-weight: bold; cursor: pointer; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; background: #4ec0ca; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        canvas { border: 4px solid #333; border-radius: 12px; background: #70c5ce; box-shadow: 0 10px 40px rgba(0,0,0,0.4); cursor: pointer; }
+        .ui { position: absolute; background: white; padding: 25px; border-radius: 20px; text-align: center; width: 280px; box-shadow: 0 8px 25px rgba(0,0,0,0.3); border: 2px solid #f79521; }
+        h1 { color: #f79521; margin-top: 0; }
+        input { width: 85%; padding: 12px; margin: 10px 0; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem; }
+        button { background: #f79521; color: white; border: none; padding: 12px; border-radius: 8px; width: 95%; font-weight: bold; cursor: pointer; font-size: 1.1rem; transition: 0.2s; }
+        button:hover { background: #e68510; transform: scale(1.02); }
         table { width: 100%; margin-top: 15px; border-collapse: collapse; }
-        th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; font-size: 0.9rem; }
-        .score-now { position: absolute; top: 20px; font-size: 40px; color: white; font-weight: bold; text-shadow: 2px 2px 0 #000; }
+        th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; }
+        .live-score { position: absolute; top: 20px; font-size: 50px; color: white; font-weight: bold; text-shadow: 3px 3px 0 #000; pointer-events: none; z-index: 10; }
     </style>
 </head>
 <body>
 
-    <div class="score-now" id="liveScore">0</div>
+    <div class="live-score" id="liveScore" style="display:none;">0</div>
     <canvas id="gameCanvas" width="320" height="480"></canvas>
 
     <div id="ui-start" class="ui">
         <h1>Ondra Bird 🐦</h1>
+        <p>Leť co nejdál!</p>
         <input type="text" id="playerName" placeholder="Tvé jméno..." maxlength="12">
         <button onclick="startGame()">START</button>
         <h3>🏆 TOP REKORDY</h3>
@@ -33,6 +36,7 @@
     </div>
 
     <script>
+        // --- KONFIGURACE SUPABASE ---
         const SUPABASE_URL = 'https://oqgvfxniqragucamwjqg.supabase.co';
         const SUPABASE_KEY = 'sb_publishable_iJanoKhANSYBXdIZsXJT8w_43o192tz';
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -41,82 +45,120 @@
         const ctx = canvas.getContext("2d");
         const liveScore = document.getElementById("liveScore");
 
-        let birdY, velocity, pipes, score, isPlaying = false, playerName = "";
-        const gravity = 0.25, jump = -5.0;
+        // --- NASTAVENÍ OBTÍŽNOSTI ---
+        const gravity = 0.2;      // Gravitace (původně 0.25)
+        const jump = -4.5;        // Síla skoku (původně -5.0)
+        const pipeSpeed = 2.0;    // Rychlost trubek (původně 2.5)
+        const gapSize = 150;      // Mezera mezi trubkami (původně 120)
 
+        let birdY, velocity, pipes, score, isPlaying = false, playerName = "";
+
+        // Načtení tabulky hned na začátku
         updateLeaderboard();
 
         function startGame() {
             playerName = document.getElementById("playerName").value.trim();
-            if (!playerName) return alert("Napiš jméno!");
+            if (!playerName) return alert("Zadej prosím jméno!");
+            
             document.getElementById("ui-start").style.display = "none";
+            liveScore.style.display = "block";
             resetGame();
             isPlaying = true;
             gameLoop();
         }
 
         function resetGame() {
-            birdY = 200; velocity = 0; score = 0;
-            pipes = [{ x: canvas.width, y: 150 }];
+            birdY = 200; 
+            velocity = 0; 
+            score = 0;
+            pipes = [{ x: canvas.width, y: 150, passed: false }];
             liveScore.innerText = "0";
         }
 
+        // Ovládání
         window.onkeydown = (e) => { if(e.code === "Space") velocity = jump; };
         canvas.onmousedown = () => { if(isPlaying) velocity = jump; };
+        canvas.ontouchstart = (e) => { e.preventDefault(); if(isPlaying) velocity = jump; };
 
         function gameLoop() {
             if (!isPlaying) return;
 
+            // Kreslení pozadí
             ctx.fillStyle = "#70c5ce";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+            // Fyzika ptáčka
             velocity += gravity;
             birdY += velocity;
 
-            // Kreslení ptáčka
+            // Kreslení ptáčka (žlutý s křídlem)
             ctx.fillStyle = "yellow";
             ctx.beginPath(); ctx.arc(60, birdY, 14, 0, Math.PI * 2); ctx.fill();
-            ctx.stroke();
+            ctx.strokeStyle = "black"; ctx.lineWidth = 2; ctx.stroke();
+            ctx.fillStyle = "white"; // křídlo
+            ctx.fillRect(50, birdY, 10, 5);
 
-            // Trubky
+            // Generování trubek
             if (pipes[pipes.length - 1].x < 160) {
-                pipes.push({ x: canvas.width, y: Math.floor(Math.random() * 200) + 50 });
+                pipes.push({ 
+                    x: canvas.width, 
+                    y: Math.floor(Math.random() * (canvas.height - 250)) + 50,
+                    passed: false
+                });
             }
 
             for (let i = pipes.length - 1; i >= 0; i--) {
-                pipes[i].x -= 2;
-                let gap = 120;
-                ctx.fillStyle = "green";
-                ctx.fillRect(pipes[i].x, 0, 50, pipes[i].y);
-                ctx.fillRect(pipes[i].x, pipes[i].y + gap, 50, canvas.height);
+                pipes[i].x -= pipeSpeed;
 
-                if (60 + 10 > pipes[i].x && 60 - 10 < pipes[i].x + 50) {
-                    if (birdY - 10 < pipes[i].y || birdY + 10 > pipes[i].y + gap) gameOver();
+                // Vykreslení trubek
+                ctx.fillStyle = "#73bf2e";
+                ctx.fillRect(pipes[i].x, 0, 50, pipes[i].y);
+                ctx.fillRect(pipes[i].x, pipes[i].y + gapSize, 50, canvas.height);
+                ctx.strokeRect(pipes[i].x, 0, 50, pipes[i].y);
+                ctx.strokeRect(pipes[i].x, pipes[i].y + gapSize, 50, canvas.height);
+
+                // Detekce nárazu (Kolize)
+                if (60 + 12 > pipes[i].x && 60 - 12 < pipes[i].x + 50) {
+                    if (birdY - 12 < pipes[i].y || birdY + 12 > pipes[i].y + gapSize) {
+                        gameOver();
+                    }
                 }
 
-                if (pipes[i].x === 58) { score++; liveScore.innerText = score; }
+                // Přičítání skóre
+                if (pipes[i].x + 50 < 60 && !pipes[i].passed) {
+                    score++;
+                    pipes[i].passed = true;
+                    liveScore.innerText = score;
+                }
+
+                // Odstranění starých trubek
                 if (pipes[i].x + 50 < 0) pipes.splice(i, 1);
             }
 
+            // Pád na zem nebo vylétnutí nahoru
             if (birdY > canvas.height || birdY < 0) gameOver();
+
             requestAnimationFrame(gameLoop);
         }
 
         async function gameOver() {
             isPlaying = false;
+            liveScore.style.display = "none";
+            alert("BUM! Tvé skóre: " + score);
+            
             await saveScore(playerName, score);
-            alert("Konec! Body: " + score);
+            
             document.getElementById("ui-start").style.display = "block";
             updateLeaderboard();
         }
 
         async function saveScore(name, score) {
-            // ZDE POUŽÍVÁME NOVOU TABULKU flappy_scores
-            await supabaseClient.from('flappy_scores').insert([{ name, score }]);
+            await supabaseClient
+                .from('flappy_scores')
+                .insert([{ name: name, score: score }]);
         }
 
         async function updateLeaderboard() {
-            // NAČÍTÁME Z NOVÉ TABULKY flappy_scores
             const { data } = await supabaseClient
                 .from('flappy_scores')
                 .select('*')
