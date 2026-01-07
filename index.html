@@ -7,65 +7,21 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root { --primary: #f79521; --bg-sky: #4ec0ca; }
-        
-        body { 
-            font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif; 
-            margin: 0; background: var(--bg-sky); 
-            display: flex; align-items: center; justify-content: center; 
-            height: 100vh; overflow: hidden; 
-        }
-        
-        canvas { 
-            border: 6px solid #fff; border-radius: 15px; 
-            background: #70c5ce; box-shadow: 0 20px 50px rgba(0,0,0,0.3); 
-        }
-
-        /* Panely menu */
-        .ui-panel { 
-            position: absolute; background: rgba(255, 255, 255, 0.95); 
-            backdrop-filter: blur(10px); padding: 25px; border-radius: 25px; 
-            text-align: center; width: 300px; 
-            box-shadow: 0 15px 35px rgba(0,0,0,0.2); 
-            border: 4px solid var(--primary); z-index: 20; 
-        }
-
-        /* Animace pro Game Over menu */
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+        body { font-family: 'Arial Rounded MT Bold', sans-serif; margin: 0; background: var(--bg-sky); display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        canvas { border: 6px solid #fff; border-radius: 15px; background: #70c5ce; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+        .ui-panel { position: absolute; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); padding: 25px; border-radius: 25px; text-align: center; width: 300px; box-shadow: 0 15px 35px rgba(0,0,0,0.2); border: 4px solid var(--primary); z-index: 20; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
         #ui-death { animation: fadeInUp 0.4s ease-out; }
-
-        h1, h2 { color: var(--primary); margin: 0 0 15px 0; text-shadow: 1px 1px 0 #fff; }
+        h1, h2 { color: var(--primary); margin: 0 0 15px 0; }
         input { width: 90%; padding: 12px; margin-bottom: 15px; border: 2px solid #ddd; border-radius: 12px; font-size: 1.1rem; outline: none; }
-        
-        button { 
-            background: var(--primary); color: white; border: none; padding: 14px; 
-            border-radius: 12px; width: 100%; font-weight: bold; cursor: pointer; 
-            font-size: 1.1rem; margin-bottom: 10px; box-shadow: 0 4px 0 #d67d16; 
-            transition: 0.1s; position: relative;
-        }
-        
+        button { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 12px; width: 100%; font-weight: bold; cursor: pointer; font-size: 1.1rem; margin-bottom: 10px; box-shadow: 0 4px 0 #d67d16; transition: 0.1s; }
         button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 #d67d16; }
-        
-        button:disabled { 
-            background: #ccc; box-shadow: 0 4px 0 #999; 
-            cursor: not-allowed; opacity: 0.7; 
-        }
-
+        button:disabled { background: #ccc; box-shadow: 0 4px 0 #999; cursor: not-allowed; opacity: 0.7; }
         button.secondary { background: #666; box-shadow: 0 4px 0 #444; }
-
-        .leaderboard-container { 
-            margin-top: 15px; background: rgba(0,0,0,0.05); 
-            border-radius: 15px; padding: 10px; font-size: 0.9rem; 
-        }
+        .leaderboard-container { margin-top: 15px; background: rgba(0,0,0,0.05); border-radius: 15px; padding: 10px; font-size: 0.9rem; }
         table { width: 100%; border-collapse: collapse; }
         td { padding: 6px; font-weight: bold; border-bottom: 1px solid rgba(0,0,0,0.05); color: #333; }
-
-        .live-score { 
-            position: absolute; top: 40px; font-size: 65px; 
-            color: white; font-weight: 900; text-shadow: 4px 4px 0 #000; z-index: 10; 
-        }
+        .live-score { position: absolute; top: 40px; font-size: 65px; color: white; font-weight: 900; text-shadow: 4px 4px 0 #000; z-index: 10; }
     </style>
 </head>
 <body>
@@ -76,7 +32,7 @@
     <div id="ui-start" class="ui-panel">
         <h1>Ondra Bird 🐦</h1>
         <input type="text" id="playerName" placeholder="Tvé jméno..." maxlength="12">
-        <button id="btn-start" onclick="startGame()">LEŤ!</button>
+        <button onclick="startGame()">LEŤ!</button>
         <div class="leaderboard-container">
             <h3>🏆 TOP REKORDY</h3>
             <table id="leaderboard"><tbody></tbody></table>
@@ -87,7 +43,7 @@
         <h2>KONEC! 💀</h2>
         <p id="finalScoreText" style="font-size: 1.8rem; font-weight: bold; margin: 10px 0; color: #333;"></p>
         <button id="btn-save" onclick="saveAndRestart()">ZAPSAT DO TABULKY</button>
-        <button id="btn-retry" class="secondary" onclick="restartImmediately()">ZKUSIT ZNOVU</button>
+        <button id="btn-retry" class="secondary" onclick="prepareToStart()">ZKUSIT ZNOVU</button>
     </div>
 
     <script>
@@ -99,14 +55,13 @@
         const ctx = canvas.getContext("2d");
         const liveScore = document.getElementById("liveScore");
 
-        // OBTÍŽNOST
         const gravity = 0.18;
         const jump = -4.2;
         const pipeSpeed = 1.9;
         const gapSize = 165;
 
-        let birdY, velocity, pipes, score, isPlaying = false, playerName = "";
-        let canClickMenu = false; // Ochranný zámek
+        let birdY, velocity, pipes, score, isPlaying = false, isWaiting = false, playerName = "";
+        let canClickMenu = false;
 
         updateLeaderboard();
 
@@ -114,31 +69,39 @@
             playerName = document.getElementById("playerName").value.trim();
             if (!playerName) return alert("Napiš své jméno!");
             document.getElementById("ui-start").style.display = "none";
-            liveScore.style.display = "block";
-            restartImmediately();
+            prepareToStart();
         }
 
-        function restartImmediately() {
-            // Pokud je menu zamknuté (těsně po smrti), ignorujeme klik
-            if (document.getElementById("ui-death").style.display !== "none" && !canClickMenu) return;
-
+        // Tato funkce nastaví hru do režimu "čekání na první klik"
+        function prepareToStart() {
             document.getElementById("ui-death").style.display = "none";
             birdY = 200; velocity = 0; score = 0;
-            pipes = [{ x: canvas.width, y: 150, passed: false }];
+            pipes = []; // Žádné trubky na začátku
             liveScore.innerText = "0";
             liveScore.style.display = "block";
             isPlaying = true;
+            isWaiting = true; // Čekáme na první skok
             gameLoop();
         }
+
+        function handleInput() {
+            if (isWaiting) {
+                isWaiting = false; // Prvním klikem vypneme čekání
+                velocity = jump;
+            } else if (isPlaying) {
+                velocity = jump;
+            }
+        }
+
+        window.onkeydown = (e) => { if(e.code === "Space") { handleInput(); e.preventDefault(); } };
+        canvas.onmousedown = (e) => { handleInput(); e.preventDefault(); };
 
         async function saveAndRestart() {
             if (!canClickMenu) return;
             const btn = document.getElementById("btn-save");
             btn.innerText = "UKLÁDÁM...";
             btn.disabled = true;
-
             await supabaseClient.from('flappy_scores').insert([{ name: playerName, score: score }]);
-            
             await updateLeaderboard();
             btn.innerText = "ZAPSAT DO TABULKY";
             btn.disabled = false;
@@ -147,21 +110,12 @@
             liveScore.style.display = "none";
         }
 
-        window.onkeydown = (e) => { if(e.code === "Space" && isPlaying) { velocity = jump; e.preventDefault(); } };
-        canvas.onmousedown = (e) => { if(isPlaying) { velocity = jump; e.preventDefault(); } };
-
         function drawBird(x, y) {
             ctx.save();
             ctx.translate(x, y);
-            // Ptáček (tělo)
             ctx.fillStyle = "yellow";
             ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = "black"; ctx.lineWidth = 2; ctx.stroke();
-            // Oko
-            ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(7, -4, 5, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(9, -4, 2, 0, Math.PI * 2); ctx.fill();
-            // Zobák
-            ctx.fillStyle = "orange"; ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(22, 4); ctx.lineTo(12, 8); ctx.fill();
             ctx.restore();
         }
 
@@ -169,11 +123,6 @@
             ctx.fillStyle = "#73bf2e";
             ctx.fillRect(x, isTop ? 0 : y, 50, h);
             ctx.strokeRect(x, isTop ? 0 : y, 50, h);
-            // Vršek trubky
-            const capY = isTop ? y - 20 : y;
-            ctx.fillStyle = "#8ed04b";
-            ctx.fillRect(x - 5, capY, 60, 20);
-            ctx.strokeRect(x - 5, capY, 60, 20);
         }
 
         function gameLoop() {
@@ -181,51 +130,50 @@
             ctx.fillStyle = "#70c5ce";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            velocity += gravity;
-            birdY += velocity;
-            drawBird(60, birdY);
+            if (isWaiting) {
+                // Ptáček jen levituje
+                birdY = 200 + Math.sin(Date.now() / 200) * 5;
+                drawBird(60, birdY);
+                ctx.fillStyle = "white";
+                ctx.font = "bold 20px Arial";
+                ctx.textAlign = "center";
+                ctx.fillText("KLIKNI PRO SKOK", canvas.width/2, canvas.height/2 + 50);
+            } else {
+                // Normální běh hry
+                velocity += gravity;
+                birdY += velocity;
+                drawBird(60, birdY);
 
-            if (pipes[pipes.length - 1].x < 160) {
-                pipes.push({ x: canvas.width, y: Math.floor(Math.random() * (canvas.height - 260)) + 50, passed: false });
-            }
-
-            for (let i = pipes.length - 1; i >= 0; i--) {
-                pipes[i].x -= pipeSpeed;
-                drawPipe(pipes[i].x, 0, pipes[i].y, true);
-                drawPipe(pipes[i].x, pipes[i].y + gapSize, canvas.height - (pipes[i].y + gapSize), false);
-
-                if (60 + 11 > pipes[i].x && 60 - 11 < pipes[i].x + 50) {
-                    if (birdY - 11 < pipes[i].y || birdY + 11 > pipes[i].y + gapSize) triggerDeath();
+                if (pipes.length === 0 || pipes[pipes.length - 1].x < 160) {
+                    pipes.push({ x: canvas.width, y: Math.floor(Math.random() * (canvas.height - 260)) + 50, passed: false });
                 }
 
-                if (pipes[i].x + 50 < 60 && !pipes[i].passed) {
-                    score++; pipes[i].passed = true; liveScore.innerText = score;
+                for (let i = pipes.length - 1; i >= 0; i--) {
+                    pipes[i].x -= pipeSpeed;
+                    drawPipe(pipes[i].x, 0, pipes[i].y, true);
+                    drawPipe(pipes[i].x, pipes[i].y + gapSize, canvas.height - (pipes[i].y + gapSize), false);
+
+                    if (60 + 11 > pipes[i].x && 60 - 11 < pipes[i].x + 50) {
+                        if (birdY - 11 < pipes[i].y || birdY + 11 > pipes[i].y + gapSize) triggerDeath();
+                    }
+                    if (pipes[i].x + 50 < 60 && !pipes[i].passed) {
+                        score++; pipes[i].passed = true; liveScore.innerText = score;
+                    }
+                    if (pipes[i].x + 60 < 0) pipes.splice(i, 1);
                 }
-                if (pipes[i].x + 60 < 0) pipes.splice(i, 1);
+                if (birdY > canvas.height || birdY < 0) triggerDeath();
             }
-            if (birdY > canvas.height || birdY < 0) triggerDeath();
             requestAnimationFrame(gameLoop);
         }
 
         function triggerDeath() {
             isPlaying = false;
-            canClickMenu = false; // Zamknout tlačítka
-            
+            canClickMenu = false;
             document.getElementById("finalScoreText").innerText = score + " BODŮ";
             document.getElementById("ui-death").style.display = "block";
-
-            // Deaktivace tlačítek v HTML
-            const btnSave = document.getElementById("btn-save");
-            const btnRetry = document.getElementById("btn-retry");
-            btnSave.disabled = true;
-            btnRetry.disabled = true;
-
-            // Odemknout až po 700ms (ochrana proti rychlokliku)
-            setTimeout(() => {
-                canClickMenu = true;
-                btnSave.disabled = false;
-                btnRetry.disabled = false;
-            }, 700);
+            const btns = document.querySelectorAll("#ui-death button");
+            btns.forEach(b => b.disabled = true);
+            setTimeout(() => { canClickMenu = true; btns.forEach(b => b.disabled = false); }, 700);
         }
 
         async function updateLeaderboard() {
