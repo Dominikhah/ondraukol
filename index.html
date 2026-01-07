@@ -3,90 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ondra Bird Easy Mode 🐦</title>
+    <title>Ondra Bird Pro 🐦</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root {
-            --primary: #f79521;
-            --bg-sky: #4ec0ca;
+        :root { --primary: #f79521; --bg-sky: #4ec0ca; }
+        body { font-family: 'Arial Rounded MT Bold', sans-serif; margin: 0; background: var(--bg-sky); display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; }
+        
+        canvas { border: 6px solid #fff; border-radius: 15px; background: #70c5ce; box-shadow: 0 20px 50px rgba(0,0,0,0.3); }
+
+        /* Společný styl pro panely */
+        .ui-panel { 
+            position: absolute; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
+            padding: 25px; border-radius: 25px; text-align: center; width: 300px; 
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2); border: 4px solid var(--primary); z-index: 20;
         }
 
-        body { 
-            font-family: 'Arial Rounded MT Bold', 'Helvetica', sans-serif; 
-            margin: 0; 
-            background: var(--bg-sky); 
-            display: flex; 
-            flex-direction: column; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
-            overflow: hidden;
-        }
-
-        .sky-decor {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            z-index: -1;
-            background: linear-gradient(to bottom, #4ec0ca 0%, #dcf2f4 100%);
-        }
-
-        canvas { 
-            border: 6px solid #fff; 
-            border-radius: 15px; 
-            background: #70c5ce; 
-            box-shadow: 0 20px 50px rgba(0,0,0,0.3); 
-        }
-
-        .ui { 
-            position: absolute; 
-            background: rgba(255, 255, 255, 0.9); 
-            backdrop-filter: blur(10px);
-            padding: 30px; 
-            border-radius: 25px; 
-            text-align: center; 
-            width: 300px; 
-            box-shadow: 0 15px 35px rgba(0,0,0,0.2); 
-            border: 4px solid var(--primary);
-        }
-
-        h1 { color: var(--primary); margin: 0 0 15px 0; font-size: 2.2rem; }
+        h1, h2 { color: var(--primary); margin: 0 0 15px 0; }
         input { width: 90%; padding: 12px; margin-bottom: 15px; border: 2px solid #ddd; border-radius: 12px; font-size: 1.1rem; }
-        button { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 12px; width: 100%; font-weight: bold; cursor: pointer; font-size: 1.3rem; box-shadow: 0 5px 0 #d67d16; }
-
-        .leaderboard-container { margin-top: 20px; background: rgba(0,0,0,0.05); border-radius: 15px; padding: 10px; }
-        table { width: 100%; border-collapse: collapse; }
-        td { padding: 8px; font-weight: bold; border-bottom: 1px solid rgba(0,0,0,0.05); }
-
-        .live-score { 
-            position: absolute; 
-            top: 40px; 
-            font-size: 70px; 
-            color: white; 
-            font-weight: 900; 
-            text-shadow: 4px 4px 0 #000; 
-            z-index: 10; 
+        
+        button { 
+            background: var(--primary); color: white; border: none; padding: 12px; border-radius: 12px; 
+            width: 100%; font-weight: bold; cursor: pointer; font-size: 1.1rem; margin-bottom: 10px;
+            box-shadow: 0 4px 0 #d67d16; transition: 0.1s;
         }
+        button.secondary { background: #666; box-shadow: 0 4px 0 #444; }
+        button:active { transform: translateY(2px); box-shadow: 0 2px 0 #d67d16; }
+
+        .leaderboard-container { margin-top: 15px; background: rgba(0,0,0,0.05); border-radius: 15px; padding: 10px; font-size: 0.9rem; }
+        table { width: 100%; border-collapse: collapse; }
+        td { padding: 5px; font-weight: bold; border-bottom: 1px solid rgba(0,0,0,0.05); }
+
+        .live-score { position: absolute; top: 40px; font-size: 60px; color: white; font-weight: 900; text-shadow: 3px 3px 0 #000; z-index: 10; }
     </style>
 </head>
 <body>
 
-    <div class="sky-decor"></div>
     <div class="live-score" id="liveScore" style="display:none;">0</div>
     <canvas id="gameCanvas" width="320" height="480"></canvas>
 
-    <div id="ui-start" class="ui">
+    <div id="ui-start" class="ui-panel">
         <h1>Ondra Bird 🐦</h1>
         <input type="text" id="playerName" placeholder="Tvé jméno..." maxlength="12">
         <button onclick="startGame()">LEŤ!</button>
-        
         <div class="leaderboard-container">
             <h3>🏆 TOP REKORDY</h3>
-            <table id="leaderboard">
-                <thead><tr><th>Hráč</th><th>Body</th></tr></thead>
-                <tbody></tbody>
-            </table>
+            <table id="leaderboard"><tbody></tbody></table>
         </div>
+    </div>
+
+    <div id="ui-death" class="ui-panel" style="display:none;">
+        <h2>KONEC! 💀</h2>
+        <p id="finalScoreText" style="font-size: 1.5rem; font-weight: bold;"></p>
+        <button onclick="saveAndRestart()">ZAPSAT DO TABULKY</button>
+        <button class="secondary" onclick="restartImmediately()">ZKUSIT ZNOVU</button>
     </div>
 
     <script>
@@ -98,12 +67,10 @@
         const ctx = canvas.getContext("2d");
         const liveScore = document.getElementById("liveScore");
 
-        // --- NASTAVENÍ OBTÍŽNOSTI (ZLEHČENO) ---
-        const gravity = 0.15;      // Ještě lehčí gravitace (ptáček se vznáší)
-        const jump = -3.8;         // Menší skok (líp se kontroluje)
-        const pipeSpeed = 1.6;     // Trubky jedou pomalu
-        const gapSize = 170;       // Obří mezera na průlet
-        // ---------------------------------------
+        const gravity = 0.18;
+        const jump = -4.2;
+        const pipeSpeed = 1.8;
+        const gapSize = 160;
 
         let birdY, velocity, pipes, score, isPlaying = false, playerName = "";
 
@@ -114,103 +81,91 @@
             if (!playerName) return alert("Napiš své jméno!");
             document.getElementById("ui-start").style.display = "none";
             liveScore.style.display = "block";
-            resetGame();
+            restartImmediately();
+        }
+
+        function restartImmediately() {
+            document.getElementById("ui-death").style.display = "none";
+            birdY = 200; velocity = 0; score = 0;
+            pipes = [{ x: canvas.width, y: 150, passed: false }];
+            liveScore.innerText = "0";
+            liveScore.style.display = "block";
             isPlaying = true;
             gameLoop();
         }
 
-        function resetGame() {
-            birdY = 200; velocity = 0; score = 0;
-            pipes = [{ x: canvas.width, y: 150, passed: false }];
-            liveScore.innerText = "0";
+        async function saveAndRestart() {
+            const btn = event.target;
+            btn.innerText = "UKLÁDÁM...";
+            btn.disabled = true;
+            await supabaseClient.from('flappy_scores').insert([{ name: playerName, score: score }]);
+            btn.innerText = "ZAPSAT DO TABULKY";
+            btn.disabled = false;
+            updateLeaderboard();
+            document.getElementById("ui-death").style.display = "none";
+            document.getElementById("ui-start").style.display = "block";
+            liveScore.style.display = "none";
         }
 
-        window.onkeydown = (e) => { if(e.code === "Space") velocity = jump; };
+        window.onkeydown = (e) => { if(e.code === "Space" && isPlaying) velocity = jump; };
         canvas.onmousedown = () => { if(isPlaying) velocity = jump; };
 
         function drawBird(x, y) {
             ctx.save();
             ctx.translate(x, y);
-            ctx.fillStyle = "#f8d348";
-            ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = "yellow";
+            ctx.beginPath(); ctx.arc(0, 0, 14, 0, Math.PI * 2); ctx.fill();
             ctx.stroke();
-            // Zobák a oko
-            ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(8, -5, 6, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(10, -5, 2.5, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = "#f79521"; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(24, 4); ctx.lineTo(14, 8); ctx.fill();
             ctx.restore();
         }
 
         function drawPipe(x, y, h, isTop) {
             ctx.fillStyle = "#73bf2e";
-            ctx.fillRect(x, isTop ? 0 : y, 52, h);
-            ctx.strokeRect(x, isTop ? 0 : y, 52, h);
-            // Vršek trubky
-            const capY = isTop ? y - 20 : y;
-            ctx.fillStyle = "#8ed04b";
-            ctx.fillRect(x - 4, capY, 60, 20);
-            ctx.strokeRect(x - 4, capY, 60, 20);
+            ctx.fillRect(x, isTop ? 0 : y, 50, h);
+            ctx.strokeRect(x, isTop ? 0 : y, 50, h);
         }
 
         function gameLoop() {
             if (!isPlaying) return;
-
             ctx.fillStyle = "#70c5ce";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             velocity += gravity;
             birdY += velocity;
-
             drawBird(60, birdY);
 
             if (pipes[pipes.length - 1].x < 160) {
-                pipes.push({ 
-                    x: canvas.width, 
-                    y: Math.floor(Math.random() * (canvas.height - 280)) + 40,
-                    passed: false
-                });
+                pipes.push({ x: canvas.width, y: Math.floor(Math.random() * (canvas.height - 250)) + 50, passed: false });
             }
 
             for (let i = pipes.length - 1; i >= 0; i--) {
                 pipes[i].x -= pipeSpeed;
                 drawPipe(pipes[i].x, 0, pipes[i].y, true);
-                drawPipe(pipes[i].x, pipes[i].y + gapSize, canvas.height - (pipes[i].y + gapSize), false);
+                drawPipe(pipes[i].x, pipes[i].y + gapSize, canvas.height, false);
 
-                if (60 + 12 > pipes[i].x && 60 - 12 < pipes[i].x + 52) {
-                    if (birdY - 12 < pipes[i].y || birdY + 12 > pipes[i].y + gapSize) gameOver();
+                if (60 + 12 > pipes[i].x && 60 - 12 < pipes[i].x + 50) {
+                    if (birdY - 12 < pipes[i].y || birdY + 12 > pipes[i].y + gapSize) triggerDeath();
                 }
 
-                if (pipes[i].x + 52 < 60 && !pipes[i].passed) {
-                    score++;
-                    pipes[i].passed = true;
-                    liveScore.innerText = score;
+                if (pipes[i].x + 50 < 60 && !pipes[i].passed) {
+                    score++; pipes[i].passed = true; liveScore.innerText = score;
                 }
                 if (pipes[i].x + 60 < 0) pipes.splice(i, 1);
             }
-
-            if (birdY > canvas.height || birdY < 0) gameOver();
+            if (birdY > canvas.height || birdY < 0) triggerDeath();
             requestAnimationFrame(gameLoop);
         }
 
-        async function gameOver() {
+        function triggerDeath() {
             isPlaying = false;
-            liveScore.style.display = "none";
-            alert("SKÓRE: " + score);
-            await supabaseClient.from('flappy_scores').insert([{ name: playerName, score: score }]);
-            document.getElementById("ui-start").style.display = "block";
-            updateLeaderboard();
+            document.getElementById("finalScoreText").innerText = score + " BODŮ";
+            document.getElementById("ui-death").style.display = "block";
         }
 
         async function updateLeaderboard() {
-            const { data } = await supabaseClient
-                .from('flappy_scores')
-                .select('*')
-                .order('score', { ascending: false })
-                .limit(5);
-
+            const { data } = await supabaseClient.from('flappy_scores').select('*').order('score', { ascending: false }).limit(5);
             if (data) {
-                const body = document.querySelector("#leaderboard tbody");
-                body.innerHTML = data.map(i => `<tr><td>${i.name}</td><td>${i.score}</td></tr>`).join("");
+                document.querySelector("#leaderboard tbody").innerHTML = data.map(i => `<tr><td>${i.name}</td><td>${i.score}</td></tr>`).join("");
             }
         }
     </script>
